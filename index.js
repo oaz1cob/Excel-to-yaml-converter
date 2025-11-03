@@ -51,56 +51,55 @@ async function xlsxToBackstageYaml(xlsxFilePath, yamlFilePath) {
         return;
       }
 
-      if (rowData.hasOwnProperty('Department') && rowData.Department == "BD/PA-TO") {
-        // Create Backstage entity
-        const entity = {
-          apiVersion: 'backstage.io/v1alpha1',
-          kind: rowData.Kind || 'Component',
-          metadata: {
-            name: NamingConvention(rowData['End User Offering Name']),
-            title: rowData['End User Offering Name'],
-            description: rowData['Taxonomy Node (VM L3)'] || '',
-            annotations: {},
-            labels: {
-              'visibility': rowData.Visibility
-            },
-            tags: ["BDC"]
+      // Create Backstage entity
+      const entity = {
+        apiVersion: 'backstage.io/v1alpha1',
+        kind: rowData.Kind || 'Component',
+        metadata: {
+          name: NamingConvention(rowData['End User Offering Name']),
+          title: rowData['End User Offering Name'],
+          description: rowData['Taxonomy Node (VM L3)'] || '',
+          annotations: {
+            'backstage.io/source-location': 'url:https://digital.bosch.com/'
           },
-          spec: {
-            type: rowData.type || 'service',
-            lifecycle: rowData.lifecycle || 'production',
-            owner: rowData['Owned by'] || 'BDC',
-            department: rowData.Department
-          }
-        };
-
-        // Handle annotations
-        if (rowData.annotations && rowData.annotations.trim() !== '') {
-          try {
-            entity.metadata.annotations = JSON.parse(rowData.annotations);
-          } catch (error) {
-            console.warn(`Invalid JSON in annotations for ${rowData.name}, using key-value parsing`);
-            entity.metadata.annotations = parseKeyValuePairs(rowData.annotations);
-          }
+          labels: {},
+          tags: ["OTP", rowData.Visibility && rowData.Visibility.toLowerCase()],
+          psm: rowData.hasOwnProperty('Proxy') ? `user:${rowData.Proxy}` : ''
+        },
+        spec: {
+          type: rowData.type || 'service',
+          lifecycle: rowData.lifecycle || 'production',
+          owner: `user:${rowData['Owned by']}` || 'BDC',
+          department: rowData.hasOwnProperty('Department') ? rowData.Department : ''
         }
+      };
 
-        // Handle labels - merge custom labels with defaults
-        if (rowData.labels && rowData.labels.trim() !== '') {
-          try {
-            const customLabels = JSON.parse(rowData.labels);
-            entity.metadata.labels = { ...entity.metadata.labels, ...customLabels };
-          } catch (error) {
-            console.warn(`Invalid JSON in labels for ${rowData.name}, using key-value parsing`);
-            const customLabels = parseKeyValuePairs(rowData.labels);
-            entity.metadata.labels = { ...entity.metadata.labels, ...customLabels };
-          }
+      // Handle annotations
+      if (rowData.annotations && rowData.annotations.trim() !== '') {
+        try {
+          entity.metadata.annotations = JSON.parse(rowData.annotations);
+        } catch (error) {
+          console.warn(`Invalid JSON in annotations for ${rowData.name}, using key-value parsing`);
+          entity.metadata.annotations = parseKeyValuePairs(rowData.annotations);
         }
-
-        // Handle other optional fields
-        if (rowData.system && rowData.system.trim() !== '') entity.spec.system = rowData.system;
-        if (rowData.domain && rowData.domain.trim() !== '') entity.spec.domain = rowData.domain;
-        entities.push(entity);
       }
+
+      // Handle labels - merge custom labels with defaults
+      if (rowData.labels && rowData.labels.trim() !== '') {
+        try {
+          const customLabels = JSON.parse(rowData.labels);
+          entity.metadata.labels = { ...entity.metadata.labels, ...customLabels };
+        } catch (error) {
+          console.warn(`Invalid JSON in labels for ${rowData.name}, using key-value parsing`);
+          const customLabels = parseKeyValuePairs(rowData.labels);
+          entity.metadata.labels = { ...entity.metadata.labels, ...customLabels };
+        }
+      }
+
+      // Handle other optional fields
+      if (rowData.system && rowData.system.trim() !== '') entity.spec.system = rowData.system;
+      if (rowData.domain && rowData.domain.trim() !== '') entity.spec.domain = rowData.domain;
+      entities.push(entity);
     });
 
     if (entities.length === 0) {
